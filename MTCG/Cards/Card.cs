@@ -60,5 +60,9 @@ namespace MTCG
 
             return damage;
         }
+        public override string ToString()
+        {
+            return "Name: "+name+" Element: "+element+" Damage: "+damage;
+        }
     }
 }
