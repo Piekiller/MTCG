@@ -12,6 +12,8 @@ namespace MTCG
         private int damage;
         public Card Attack(Card other)
         {
+            if (this.CalculateDamage(other) == other.CalculateDamage(this))
+                return null;
             return this.CalculateDamage(other) > other.CalculateDamage(this) ? this : other;
         }
 
