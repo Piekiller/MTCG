@@ -2,7 +2,8 @@
 
 namespace MTCG
 {
-    public class Class1
+    class Spellcard:Card
     {
+
     }
 }
