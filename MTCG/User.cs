@@ -1,28 +1,33 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace MTCG
 {
-    class User
+    public class User
     {
         public Guid ID { get; }
         public string Username { get; }
-        public string PWHash { get; }
+        public byte[] PWHash { get; }
         public List<Card> Stack { get; } = new List<Card>();
         public int Coins { get; }
         public List<Card> Deck { get; } = new List<Card>();
         public int ELO { get; private set; }
-        private int WonGames;
+        public int WonGames { get; private set; }
+        public string Image { get; }
+        public string Bio { get; }
 
         public User(Guid id, string name, string pwhash, int coins)
         {
             this.ID = id;
             this.Username = name;
-            this.PWHash = pwhash;
+            this.PWHash = SHA256.Create().ComputeHash(Encoding.UTF8.GetBytes(id.ToString()+pwhash)) ;
             this.Coins = coins;
             this.ELO = 100;
             this.WonGames = 0;
+            this.Image = string.Empty;
+            this.Bio = string.Empty;
         }
 
         public void Win()

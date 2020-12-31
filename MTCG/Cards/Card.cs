@@ -4,7 +4,7 @@ using System.Text;
 
 namespace MTCG
 {
-    class Card
+    public class Card
     {
         private Guid id;
         private Element element;

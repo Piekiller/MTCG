@@ -4,7 +4,7 @@ using System.Text;
 
 namespace MTCG
 {
-    class Server
+    public class Server
     {
         List<User> _activeusers=new List<User>();
 
