@@ -18,7 +18,7 @@ namespace MTCG
         public string Image { get; }
         public string Bio { get; }
 
-        public User(Guid id, string name, string pwhash, int coins)
+        public User(Guid id, string name, byte[] pwhash, int coins)
         {
             this.ID = id;
             this.Username = name;
@@ -29,7 +29,17 @@ namespace MTCG
             this.Image = string.Empty;
             this.Bio = string.Empty;
         }
-
+        public User(Guid id, string name, byte[] pwhash, int coins, int elo, int wongames, string image, string bio)
+        {
+            this.ID = id;
+            this.Username = name;
+            this.PWHash = pwhash;
+            this.Coins = coins;
+            this.ELO = elo;
+            this.WonGames = wongames;
+            this.Image = image;
+            this.Bio = bio;
+        }
         public void Win()
         {
             WonGames++;

@@ -38,7 +38,7 @@ namespace MTCG
                 int won = reader.GetInt32(4);
                 string image = reader.GetString(5);
                 string bio = reader.GetString(6);
-                return new User(guid,username,pwhash,coins,elo,won,image,bio);
+                return new User(guid,username,pw,coins,elo,won,image,bio);
             }
             catch (Exception e)
             {
