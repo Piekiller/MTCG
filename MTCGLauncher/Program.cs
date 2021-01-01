@@ -6,9 +6,11 @@ namespace MTCGLauncher
     {
         static void Main(string[] args)
         {
-            PostgreSQLDB db = new PostgreSQLDB();
-            User user = new User(Guid.NewGuid(),"bob", "test", 20);
-            Console.WriteLine(   db.CreatePlayer(user));
+            User user = new User(Guid.NewGuid(), "te1", "123");
+            Console.ReadKey();
+            /*Server s = new Server();
+            s.RegisterRoutes();
+            Console.ReadKey();*/
         }
     }
 }
