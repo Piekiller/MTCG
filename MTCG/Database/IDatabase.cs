@@ -15,10 +15,13 @@ namespace MTCG
 
         bool CreatePackage(Package pack);
         Package ReadPackage(Guid id);
+        bool DeletePackage(Package pack);
 
-        bool CreateDeck(Card[] deck);
-        bool UpdateDeck(Card[] deck);
-        Card[] ReadDeck(Guid player);
+        bool CreateDeck(User user);
+        bool UpdateDeck(User user);
+        List<Card> ReadDeck(Guid playerid);
+
+        bool CreateStack(User user);
 
         bool CreateTrade(Trade trade);
         Trade[] ReadTrades();

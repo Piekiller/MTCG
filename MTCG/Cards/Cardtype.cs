@@ -4,8 +4,9 @@ using System.Text;
 
 namespace MTCG
 {
-    class Monstercard:Card
+    public enum Cardtype
     {
-
+        Spell,
+        Monster
     }
 }

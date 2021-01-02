@@ -6,35 +6,55 @@ namespace MTCG
 {
     public class Card
     {
-        private Guid id;
-        private Element element;
-        private string name;
-        private int damage;
+        public Guid id;
+        public Element element;
+        public string name;
+        public int damage;
+        public bool isLocked;
+        public Cardtype type;
+        public Card(Guid id, Element element, string name, int damage, bool isLocked)
+        {
+            this.id = id;
+            this.element = element;
+            this.name = name;
+            this.damage = damage;
+            this.isLocked = isLocked;
+            this.type = name.ToLower().Contains("spell") ? Cardtype.Spell : Cardtype.Monster;
+        }
+        public Card(Guid id, Element element, string name, int damage)
+        {
+            this.id = id;
+            this.element = element;
+            this.name = name;
+            this.damage = damage;
+            this.isLocked = false;
+            this.type=name.ToLower().Contains("spell")?Cardtype.Spell:Cardtype.Monster;
+
+        }
         public Card Attack(Card other)
         {
             if (this.CalculateDamage(other) == other.CalculateDamage(this))
                 return null;
             return this.CalculateDamage(other) > other.CalculateDamage(this) ? this : other;
         }
-
         private int CalculateDamage(Card other)
         {
-            if (this.name == "Goblin" && other.name == "Dragon")
+            if (this.name.ToLower().Contains("goblin") && other.name.ToLower().Contains("dragon"))
                 return 0;
 
-            if (this.name == "Ork" && other.name == "Wizard")
+            if (this.name.ToLower().Contains("ork") && other.name.ToLower().Contains("wizard"))
                 return 0;
 
-            if (this.name == "WaterSpell" && other.name == "Knight")
+            if (this.name == "WaterSpell" && other.name.ToLower().Contains("knight"))
                 return int.MaxValue;
 
-            if (this is Spellcard && other.name == "Kraken")
+            if (this.type==Cardtype.Spell&& other.name.ToLower().Contains("kraken"))
                 return 0;
 
-            if (this.name=="Dragon" && other.name == "FireElve")
+            if (this.name.ToLower().Contains("Dragon") && other.name == "FireElve")
                 return 0;
 
-            if (this is Monstercard && other is Monstercard)
+            if (this.type == Cardtype.Monster && other.type==Cardtype.Spell)
                 return damage;
             /* water -> fire
             •  fire -> normal

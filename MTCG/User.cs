@@ -10,9 +10,9 @@ namespace MTCG
         public Guid ID { get; }
         public string Username { get; }
         public byte[] PWHash { get; }
-        public List<Card> Stack { get; } = new List<Card>();
+        public List<Card> Stack { get; private set; } = new List<Card>();
         public int Coins { get; }
-        public List<Card> Deck { get; } = new List<Card>();
+        public List<Card> Deck { get; private set; } = new List<Card>();
         public int ELO { get; private set; }
         public int WonGames { get; private set; }
         public string Image { get; }
@@ -53,6 +53,11 @@ namespace MTCG
         public void Draw()
         {
             WonGames++;
+        }
+
+        public void SetDeck(List<Card> deck)
+        {
+            Deck = deck;
         }
     }
 }

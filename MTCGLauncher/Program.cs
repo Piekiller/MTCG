@@ -7,8 +7,9 @@ namespace MTCGLauncher
         static void Main(string[] args)
         {
             PostgreSQLDB db = new PostgreSQLDB();
-            User user = new User(Guid.NewGuid(),"bob", "test", 20);
-            Console.WriteLine(   db.CreatePlayer(user));
+            //db.CreateCard(new Monstercard(Guid.NewGuid(), Element.Fire, "te", 1, false));
+            Console.WriteLine();
+            Console.ReadKey();
         }
     }
 }
