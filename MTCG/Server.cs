@@ -170,11 +170,20 @@ namespace MTCG
             });
             server.RegisterRoute("GET", "/score", (ac, sw) =>
             {
-                //ToDo: Score
+                //ToDo: GetAllUsersAndOrderBY select elo, wongames from user order by elo, wongames;
             });
             server.RegisterRoute("POST", "/battles", (ac, sw) =>
             {
-
+                string username;
+                if ((username = CheckAuthorization(ac)) == null)
+                {
+                    HTTPServer.SendError(sw, HttpStatusCode.Forbidden);
+                    return;
+                }
+                User user;
+                if ((user=db.ReadPlayer(username))==null)
+                    return;
+                JoinMatchmaking(user);
             });
             server.RegisterRoute("GET", "/tradings", (ac, sw) =>
             {
