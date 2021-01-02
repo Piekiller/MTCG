@@ -5,7 +5,7 @@ using System.Text;
 using Npgsql;
 using Npgsql.Replication.PgOutput.Messages;
 using NpgsqlTypes;
-
+using System.Linq;
 namespace MTCG
 {
     public class PostgreSQLDB:IDatabase
@@ -16,7 +16,11 @@ namespace MTCG
             conn.Open();
             return conn;
         }
-
+        public PostgreSQLDB()
+        {
+            NpgsqlConnection.GlobalTypeMapper.MapEnum<Element>("Element");
+            NpgsqlConnection.GlobalTypeMapper.MapEnum<Cardtype>("Cardtype");
+        }
         public User ReadPlayer(string username)
         {
             try
@@ -100,37 +104,187 @@ namespace MTCG
 
         public bool CreateCard(Card card)
         {
-            throw new NotImplementedException();
+            try
+            {
+                using NpgsqlConnection conn = OpenConnection();
+                using var cmd = new NpgsqlCommand("insert into Card values (@id, @name, @damage, @isLocked, @element, @cardtype)", conn);
+                cmd.Parameters.AddWithValue("@id", card.id) ;
+                cmd.Parameters.AddWithValue("@name", card.name);
+                cmd.Parameters.AddWithValue("@damage", card.damage);
+                cmd.Parameters.AddWithValue("@isLocked", card.isLocked);
+                cmd.Parameters.AddWithValue("@element", card.element);
+                cmd.Parameters.AddWithValue("@cardtype", card.type);
+
+
+                Console.WriteLine(cmd.CommandText);
+                cmd.Prepare();
+                cmd.ExecuteNonQuery();
+                return true;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return false;
+            }
         }
 
         public Card ReadCard(Guid id)
         {
-            throw new NotImplementedException();
+            try
+            {
+                using NpgsqlConnection conn = OpenConnection();
+                using var cmd = new NpgsqlCommand("select name, damage, isLocked, element, cardtype from Card where id=@id", conn);
+                cmd.Parameters.AddWithValue("@id", id);
+                cmd.Prepare();
+
+                NpgsqlDataReader reader = cmd.ExecuteReader();
+
+                if (!reader.Read())
+                    return null;
+                string name = reader.GetString(0);
+                int damage = reader.GetInt32(1);
+                bool isLocked = reader.GetBoolean(2);
+                Element element = reader.GetFieldValue<Element>(3);
+                Cardtype type = reader.GetFieldValue<Cardtype>(4);
+
+
+                return new Card(id,element,name,damage,isLocked);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return null;
+            }
         }
 
         public bool CreatePackage(Package pack)
         {
-            throw new NotImplementedException();
+            try
+            {
+                using NpgsqlConnection conn = OpenConnection();
+                using var cmd = new NpgsqlCommand("insert into Package values (@id,@cards)", conn);
+                cmd.Parameters.AddWithValue("@id", pack.id);
+                cmd.Parameters.AddWithValue("@cards",pack.cards.Select((v)=>v.id));
+
+                Console.WriteLine(cmd.CommandText);
+                cmd.Prepare();
+                cmd.ExecuteNonQuery();
+                return true;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return false;
+            }
         }
 
         public Package ReadPackage(Guid id)
         {
-            throw new NotImplementedException();
+            try
+            {
+                using NpgsqlConnection conn = OpenConnection();
+                using var cmd = new NpgsqlCommand("select id, cards from Package where id=@id", conn);
+                cmd.Parameters.AddWithValue("@id", id);
+                cmd.Prepare();
+
+                NpgsqlDataReader reader = cmd.ExecuteReader();
+
+                if (!reader.Read())
+                    return null;
+                Guid[] cards = reader.GetFieldValue <Guid[]>(0);
+
+                List<Card> res = new List<Card>();
+                foreach (var item in cards)
+                {
+                    Card tmp;
+                    if((tmp=ReadCard(item))!= null)
+                    {
+                        res.Add(tmp);
+                    }
+                }
+
+                return new Package(id, res);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return null;
+            }
         }
 
-        public bool CreateDeck(Card[] deck)
+        public bool CreateDeck(User user)
         {
-            throw new NotImplementedException();
+            try
+            {
+                using NpgsqlConnection conn = OpenConnection();
+                using var cmd = new NpgsqlCommand("insert into Deck values (@id,@cards)", conn);
+                cmd.Parameters.AddWithValue("@id", user.ID);
+                cmd.Parameters.AddWithValue("@cards", user.Deck.Select((v) => v.id));
+
+                Console.WriteLine(cmd.CommandText);
+                cmd.Prepare();
+                cmd.ExecuteNonQuery();
+                return true;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return false;
+            }
         }
 
-        public bool UpdateDeck(Card[] deck)
+        public bool UpdateDeck(User user)
         {
-            throw new NotImplementedException();
+            try
+            {
+                using NpgsqlConnection conn = OpenConnection();
+                using var cmd = new NpgsqlCommand("update Deck set @cards where @id=Player", conn);
+                cmd.Parameters.AddWithValue("@id", user.ID);
+                cmd.Parameters.AddWithValue("@cards", user.Deck.Select((v) => v.id));
+
+                Console.WriteLine(cmd.CommandText);
+                cmd.Prepare();
+                cmd.ExecuteNonQuery();
+                return true;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return false;
+            }
         }
 
-        public Card[] ReadDeck(Guid player)
+        public List<Card> ReadDeck(Guid id)
         {
-            throw new NotImplementedException();
+            try
+            {
+                using NpgsqlConnection conn = OpenConnection();
+                using var cmd = new NpgsqlCommand("select cards from Deck where id=@id", conn);
+                cmd.Parameters.AddWithValue("@id", id);
+                cmd.Prepare();
+
+                NpgsqlDataReader reader = cmd.ExecuteReader();
+
+                if (!reader.Read())
+                    return null;
+                Guid[] cards = reader.GetFieldValue<Guid[]>(0);
+
+                List<Card> res = new List<Card>();
+                foreach (var item in cards)
+                {
+                    Card tmp;
+                    if ((tmp = ReadCard(item)) != null)
+                    {
+                        res.Add(tmp);
+                    }
+                }
+                return res;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return null;
+            }
         }
 
         public bool CreateTrade(Trade trade)
@@ -146,6 +300,88 @@ namespace MTCG
         public bool UpdateTrade(Trade trade)
         {
             throw new NotImplementedException();
+        }
+
+        public bool DeletePackage(Package pack)
+        {
+            try
+            {
+                using NpgsqlConnection conn = OpenConnection();
+                using var cmd = new NpgsqlCommand("delete Package where @id=ID", conn);
+                cmd.Parameters.AddWithValue("@id", pack.id);
+
+                Console.WriteLine(cmd.CommandText);
+                cmd.Prepare();
+                cmd.ExecuteNonQuery();
+                return true;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return false;
+            }
+        }
+
+        public bool CreateStack(User user)
+        {
+            try
+            {
+                using NpgsqlConnection conn = OpenConnection();
+                using var cmd = new NpgsqlCommand("insert into stack values (@id,@cards)", conn);
+                cmd.Parameters.AddWithValue("@id", user.ID);
+                cmd.Parameters.AddWithValue("@cards", user.Stack.Select((v) => v.id));
+
+                Console.WriteLine(cmd.CommandText);
+                cmd.Prepare();
+                cmd.ExecuteNonQuery();
+                return true;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return false;
+            }
+        }
+
+        public bool UpdateStack(User user)
+        {
+            try
+            {
+                using NpgsqlConnection conn = OpenConnection();
+                using var cmd = new NpgsqlCommand("update Stack set @cards where @id=Player", conn);
+                cmd.Parameters.AddWithValue("@id", user.ID);
+                cmd.Parameters.AddWithValue("@cards", user.Stack.Select((v) => v.id));
+
+                Console.WriteLine(cmd.CommandText);
+                cmd.Prepare();
+                cmd.ExecuteNonQuery();
+                return true;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return false;
+            }
+        }
+
+        public bool RemoveStack(User user)
+        {
+            try
+            {
+                using NpgsqlConnection conn = OpenConnection();
+                using var cmd = new NpgsqlCommand("delete Stack where @id=ID", conn);
+                cmd.Parameters.AddWithValue("@id", user.ID);
+
+                Console.WriteLine(cmd.CommandText);
+                cmd.Prepare();
+                cmd.ExecuteNonQuery();
+                return true;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return false;
+            }
         }
     }
 }
