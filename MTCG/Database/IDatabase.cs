@@ -19,12 +19,16 @@ namespace MTCG
 
         bool CreateDeck(User user);
         bool UpdateDeck(User user);
-        List<Card> ReadDeck(Guid playerid);
+        List<Card> ReadDeck(User user);
 
         bool CreateStack(User user);
+        bool UpdateStack(User user);
+        List<Card> ReadStack(User user);
 
         bool CreateTrade(Trade trade);
-        Trade[] ReadTrades();
+        List<Trade> ReadTrades();
         bool UpdateTrade(Trade trade);
+
+        List<User> ReadScoreboard();
     }
 }

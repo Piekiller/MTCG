@@ -254,13 +254,13 @@ namespace MTCG
             }
         }
 
-        public List<Card> ReadDeck(Guid id)
+        public List<Card> ReadDeck(User user)
         {
             try
             {
                 using NpgsqlConnection conn = OpenConnection();
                 using var cmd = new NpgsqlCommand("select cards from Deck where id=@id", conn);
-                cmd.Parameters.AddWithValue("@id", id);
+                cmd.Parameters.AddWithValue("@id", user.ID);
                 cmd.Prepare();
 
                 NpgsqlDataReader reader = cmd.ExecuteReader();
@@ -289,17 +289,83 @@ namespace MTCG
 
         public bool CreateTrade(Trade trade)
         {
-            throw new NotImplementedException();
+            try
+            {
+                using NpgsqlConnection conn = OpenConnection();
+                using var cmd = new NpgsqlCommand("insert into Trade values (@id,@card,@cardtype,@element,@mindamage)", conn);
+                cmd.Parameters.AddWithValue("@id", trade.id);
+                cmd.Parameters.AddWithValue("@card", trade.card.id);
+                cmd.Parameters.AddWithValue("@cardtype", trade.cardtype);
+                cmd.Parameters.AddWithValue("@element", trade.element);
+                cmd.Parameters.AddWithValue("@mindamage", trade.minDamage);
+
+                Console.WriteLine(cmd.CommandText);
+                cmd.Prepare();
+                cmd.ExecuteNonQuery();
+                return true;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return false;
+            }
         }
 
-        public Trade[] ReadTrades()
+        public List<Trade> ReadTrades()
         {
-            throw new NotImplementedException();
+            try
+            {
+                using NpgsqlConnection conn = OpenConnection();
+                using var cmd = new NpgsqlCommand("SELECT \"Id\", card, cardtype, element, minDamage FROM Trade", conn);
+                cmd.Prepare();
+
+                NpgsqlDataReader reader = cmd.ExecuteReader();
+
+                if (!reader.Read())
+                    return null;
+                List<Trade> trades = new List<Trade>();
+                while (reader.Read())
+                {
+                    Guid guid = reader.GetFieldValue<Guid>(0);
+                    Guid carduuid = reader.GetFieldValue<Guid>(1);
+                    Cardtype type = reader.GetFieldValue<Cardtype>(2);
+                    Element element = reader.GetFieldValue<Element>(3);
+                    int minDamage = reader.GetInt32(4);
+                    Card card = ReadCard(carduuid);
+                    if (element == default)
+                        trades.Add(new Trade(guid, card, type, minDamage));
+                    else
+                        trades.Add(new Trade(guid, card, type, element));
+                }
+                return trades;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return null;
+            }
+            
         }
 
         public bool UpdateTrade(Trade trade)
         {
-            throw new NotImplementedException();
+            try
+            {
+                using NpgsqlConnection conn = OpenConnection();
+                using var cmd = new NpgsqlCommand("update Trade set card=@card, cardtype=@cardtype, element=@element, mindamage=@mindamage where id=@id", conn);
+                cmd.Parameters.AddWithValue("@id", trade.id);
+                cmd.Parameters.AddWithValue("@card", trade.card.id);
+                cmd.Parameters.AddWithValue("@cardtype", trade.cardtype);
+                cmd.Parameters.AddWithValue("@element", trade.element);
+                cmd.Parameters.AddWithValue("@mindamage", trade.minDamage);
+                cmd.Prepare();
+                cmd.ExecuteNonQuery();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public bool DeletePackage(Package pack)
@@ -364,23 +430,71 @@ namespace MTCG
             }
         }
 
-        public bool RemoveStack(User user)
+        public List<Card> ReadStack(User user)
         {
             try
             {
                 using NpgsqlConnection conn = OpenConnection();
-                using var cmd = new NpgsqlCommand("delete Stack where @id=ID", conn);
+                using var cmd = new NpgsqlCommand("select cards from Stack where id=@id", conn);
                 cmd.Parameters.AddWithValue("@id", user.ID);
-
-                Console.WriteLine(cmd.CommandText);
                 cmd.Prepare();
-                cmd.ExecuteNonQuery();
-                return true;
+
+                NpgsqlDataReader reader = cmd.ExecuteReader();
+
+                if (!reader.Read())
+                    return null;
+                Guid[] cards = reader.GetFieldValue<Guid[]>(0);
+
+                List<Card> res = new List<Card>();
+                foreach (var item in cards)
+                {
+                    Card tmp;
+                    if ((tmp = ReadCard(item)) != null)
+                    {
+                        res.Add(tmp);
+                    }
+                }
+                return res;
             }
             catch (Exception e)
             {
                 Console.WriteLine(e.Message);
-                return false;
+                return null;
+            }
+        }
+
+        public List<User> ReadScoreboard()
+        {
+            try
+            {
+
+                using NpgsqlConnection conn = OpenConnection();
+                using var cmd = new NpgsqlCommand("select id, pwhash, coins, elo, wongames, image, bio, username from \"user\" order by elo, wongames", conn);
+                cmd.Prepare();
+
+                NpgsqlDataReader reader = cmd.ExecuteReader();
+
+                if (!reader.Read())
+                    return null;
+                List<User> sortedList = new List<User>();
+                while (reader.Read())
+                {
+                    Guid guid = reader.GetFieldValue<Guid>(0);
+                    byte[] pw = reader.GetFieldValue<byte[]>(1);
+                    int coins = reader.GetInt32(2);
+                    int elo = reader.GetInt32(3);
+                    int won = reader.GetInt32(4);
+                    string image = reader.GetString(5);
+                    string bio = reader.GetString(6);
+                    string username = reader.GetString(7);
+                    sortedList.Add(new User(guid, username, pw, coins, elo, won, image, bio));
+                }
+                return sortedList;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return null;
             }
         }
     }
