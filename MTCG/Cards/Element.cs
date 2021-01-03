@@ -4,7 +4,7 @@ using System.Text;
 
 namespace MTCG
 {
-    enum Element
+    public enum Element
     {
         Water,
         Fire,

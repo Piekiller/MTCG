@@ -14,6 +14,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Webserver", "Webserver\Webs
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebserverTests", "WebserverTests\WebserverTests.csproj", "{69F2CA65-25FE-4B90-9441-4E6EAC6A5F41}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MTCGLauncher", "MTCGLauncher\MTCGLauncher.csproj", "{8BE06E65-ABB3-4F79-B495-D82396770698}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -32,6 +34,10 @@ Global
 		{69F2CA65-25FE-4B90-9441-4E6EAC6A5F41}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{69F2CA65-25FE-4B90-9441-4E6EAC6A5F41}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{69F2CA65-25FE-4B90-9441-4E6EAC6A5F41}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8BE06E65-ABB3-4F79-B495-D82396770698}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8BE06E65-ABB3-4F79-B495-D82396770698}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8BE06E65-ABB3-4F79-B495-D82396770698}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8BE06E65-ABB3-4F79-B495-D82396770698}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

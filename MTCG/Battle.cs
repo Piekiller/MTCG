@@ -59,7 +59,7 @@ namespace MTCG
                 player1.Draw();
                 player2.Draw();
             }
-
+            return results;
         }
     }
 }
