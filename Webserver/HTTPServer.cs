@@ -34,7 +34,7 @@ namespace Webserver
             }
             catch(Exception e)
             {
-                Console.WriteLine(e);
+                //Console.WriteLine(e);
             }
             
         }
@@ -43,15 +43,15 @@ namespace Webserver
         {
             using StreamReader sr = new StreamReader(client.GetReadStream());
             using StreamWriter sw = new StreamWriter(client.GetWriteStream());
-            Console.WriteLine("Client connected");
+            //Console.WriteLine("Client connected");
 
             string message = sr.ReadLine(); //Erste Line von dem HTTP Request
-            Console.WriteLine("\nFirst Line: ");
-            Console.WriteLine(message);
+            //Console.WriteLine("\nFirst Line: ");
+            //Console.WriteLine(message);
             string[] splits = message.Split(" ");
             if (splits.Length < 3)//Bei zu wenigen Parametern BadRequest
             {
-                SendError(sw, HttpStatusCode.BadRequest);
+                SendError(sw, HttpStatusCode.BadRequest,"Bad Request, too few parameters");
                 return;
             }
             string verb = splits[0];
@@ -62,7 +62,7 @@ namespace Webserver
             KeyValuePair<(string verb, string path), Action<RequestContext, StreamWriter>> res = GetBestRoute(verb, path);
             if (res.Value == null)
             {
-                SendError(sw, HttpStatusCode.NotFound);
+                SendError(sw, HttpStatusCode.NotFound,"There is no ressource bound to this route");
                 return;
             }
             res.Value(rc, sw);
@@ -79,7 +79,7 @@ namespace Webserver
 
         private RequestContext ReadPayload(StreamReader sr, string path, Dictionary<string, string> header,string verb,string httpVersion)
         {
-            Console.WriteLine("\nPayload: ");
+            //Console.WriteLine("\nPayload: ");
             var contentset = header.Where((val) => val.Key == "Content-Length").FirstOrDefault();
             int contentlength = 0;
             int.TryParse(contentset.Value, out contentlength);//If contentlength not parsable content empty
@@ -88,20 +88,20 @@ namespace Webserver
             string h = path.Substring(path.LastIndexOf('/') + 1);
             int.TryParse(h, out requestedID);
             sr.ReadBlock(payload);
-            Console.WriteLine(payload);
+            //Console.WriteLine(payload);
             return new RequestContext(verb, path, httpVersion, header, new string(payload), requestedID);
         }
         private Dictionary<string,string> ReadHeaders(StreamReader sr)
         {
             Dictionary<string, string> header = new Dictionary<string, string>();
             string message = null;
-            Console.WriteLine("\nHeaders: ");
+            //Console.WriteLine("\nHeaders: ");
             while (!sr.EndOfStream)
             {
                 message = sr.ReadLine();
                 if (string.IsNullOrWhiteSpace(message))//Bei Leerzeile, also Head Block Ende
                     break;
-                Console.WriteLine(message);
+                //Console.WriteLine(message);
                 int indexof = message.IndexOf(':');//get index of first : in case of host: localhost:10000
                 if (indexof < 0)
                     continue;
@@ -116,9 +116,9 @@ namespace Webserver
             stream.WriteLine(response);
             stream.Flush();
         }
-        public static void SendError(StreamWriter stream, HttpStatusCode statuscode)
+        public static void SendError(StreamWriter stream, HttpStatusCode statuscode, string message)
         {
-            string response = $"HTTP/1.1 {(int)statuscode} {statuscode}\nContent-Length: 0\n";
+            string response = $"HTTP/1.1 {(int)statuscode} {statuscode}\nContent-Length: {message.Length}\nContent-Type: text/plain; charset=utf-8\n\n{message}";
             stream.WriteLine(response);
             stream.Flush();
         }
