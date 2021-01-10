@@ -1,19 +1,23 @@
-﻿namespace MTCG
+﻿using System;
+
+namespace MTCG
 {
     public class Trade
     {
+        public User user;
+        public Guid id;
         public Card card;
         public Cardtype cardtype;
         public Element element;
         public int minDamage;//minDamage of other Card
 
-        public Trade(Card card,Cardtype cardtype,Element element)
+        public Trade(User user,Guid id, Card card,Cardtype cardtype,Element element)
         {
             this.card = card;
             this.cardtype = cardtype;
             this.element = element;
         }
-        public Trade(Card card, Cardtype cardtype, int minDamage)
+        public Trade(User user,Guid id, Card card, Cardtype cardtype, int minDamage)
         {
             this.card = card;
             this.cardtype = cardtype;

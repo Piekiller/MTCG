@@ -72,8 +72,8 @@ namespace Webserver
         {
             return routes.Where((keyval, action) =>
             {
-                int indexofSlash = path.LastIndexOf('/');
-                return keyval.Key.verb == verb && keyval.Key.path.Trim('*') == (indexofSlash == 0 ? path : path.Substring(0, indexofSlash + 1));
+                int indexofSlash = path.LastIndexOf("/");
+                return keyval.Key.verb == verb && (keyval.Key.path.Trim('*') == (indexofSlash == 0 ? path : path.Substring(0, indexofSlash + 1)) || (keyval.Key.path==path));
             }).FirstOrDefault();
         }
 
@@ -92,7 +92,7 @@ namespace Webserver
             return new RequestContext(verb, path, httpVersion, header, new string(payload), requestedID);
         }
         private Dictionary<string,string> ReadHeaders(StreamReader sr)
-        {
+       {
             Dictionary<string, string> header = new Dictionary<string, string>();
             string message = null;
             //Console.WriteLine("\nHeaders: ");

@@ -84,5 +84,14 @@ namespace MTCG
         {
             return "Name: "+name+" Element: "+element+" Damage: "+damage;
         }
+
+        public override bool Equals(object obj)
+        {
+            return this.id.Equals((obj as Card).id);
+        }
+        public override int GetHashCode()
+        {
+            return id.GetHashCode();
+        }
     }
 }

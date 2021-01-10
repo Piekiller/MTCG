@@ -7,7 +7,7 @@ namespace MTCG
     class Battle
     {
         static private Random _rn = new Random();
-        List<string> Startbattle(User player1, User player2)
+        public static List<string> Startbattle(User player1, User player2)
         {
             List<string> results = new List<string>();
 
@@ -16,10 +16,10 @@ namespace MTCG
             p1.AddRange(player1.Deck);
             p2.AddRange(player2.Deck);
             int i;
-            for (i = 0; i < 100||p1.Count==0||p2.Count==0; i++)
+            for (i = 0; !(!(i < 100)||!(p1.Count!=0)||!(p2.Count!=0)); i++)
             {
                 Card c1 = p1[_rn.Next(p1.Count)];
-                Card c2 = p2[_rn.Next(p1.Count)];
+                Card c2 = p2[_rn.Next(p2.Count)];
 
                 Card winner = c1.Attack(c2);
                 results.Add("Counts: Player 1: " + p1.Count + " Player 2: " + p2.Count);
@@ -39,7 +39,7 @@ namespace MTCG
                 {
                     results.Add($"Round: {i} Player 2 wins");
                     p2.Add(c1);
-                    p2.Remove(c1);
+                    p1.Remove(c1);
                 }
             }
             if (p1.Count == 0)

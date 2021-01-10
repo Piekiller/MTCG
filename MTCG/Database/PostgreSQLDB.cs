@@ -46,7 +46,7 @@ namespace MTCG
                 deck = ReadDeck(guid);
                 stack = ReadStack(guid);
 
-                return new User(guid,username,pw,coins,elo,won,image,bio,deck,stack);
+                return new User(guid, username, pw, coins, elo, won, image, bio, deck, stack);
             }
             catch (Exception e)
             {
@@ -54,13 +54,45 @@ namespace MTCG
                 return null;
             }
         }
+        public User ReadPlayer(Guid id)
+        {
+            try
+            {
+                using NpgsqlConnection conn = OpenConnection();
+                using var cmd = new NpgsqlCommand("select \"username\", \"Password\", \"Coins\", \"Elo\", \"WonGames\", \"Image\", \"Bio\" from \"user\" where \"Id\"=@id", conn);
+                cmd.Parameters.AddWithValue("@id", id);
+                cmd.Prepare();
 
+                NpgsqlDataReader reader = cmd.ExecuteReader();
+
+                if (!reader.Read())
+                    return null;
+
+                string username = reader.GetString(0);
+                byte[] pw = reader.GetFieldValue<byte[]>(1);
+                int coins = reader.GetInt32(2);
+                int elo = reader.GetInt32(3);
+                int won = reader.GetInt32(4);
+                string image = reader.GetString(5);
+                string bio = reader.GetString(6);
+                List<Card> deck, stack;
+                deck = ReadDeck(id);
+                stack = ReadStack(id);
+
+                return new User(id, username, pw, coins, elo, won, image, bio, deck, stack);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return null;
+            }
+        }
         public bool UpdatePlayer(User user)
         {
             try
             {
                 using NpgsqlConnection conn = OpenConnection();
-                using var cmd = new NpgsqlCommand("update user set Name=@name, Password=@password, Image=@image, Bio=@bio, Elo=@elo, WonGames=@wonGames, Coins=@coins where \"id\"=@id", conn);
+                using var cmd = new NpgsqlCommand("update user set Name=@name, Password=@password, Image=@image, Bio=@bio, Elo=@elo, WonGames=@wonGames, Coins=@coins where \"Id\"=@id", conn);
                 cmd.Parameters.AddWithValue("@name", user.Username);
                 cmd.Parameters.AddWithValue("@password", user.Username);
                 cmd.Parameters.AddWithValue("@image", user.Image);
@@ -97,6 +129,8 @@ namespace MTCG
                 Console.WriteLine(cmd.CommandText);
                 cmd.Prepare();
                 cmd.ExecuteNonQuery();
+                CreateDeck(user);
+                CreateStack(user);
                 return true;
             }
             catch(Exception e)
@@ -111,7 +145,7 @@ namespace MTCG
             try
             {
                 using NpgsqlConnection conn = OpenConnection();
-                using var cmd = new NpgsqlCommand("insert into Card values (@id, @name, @damage, @isLocked, @element, @cardtype)", conn);
+                using var cmd = new NpgsqlCommand("insert into \"Card\" values (@id, @name, @damage, @isLocked, @element, @cardtype)", conn);
                 cmd.Parameters.AddWithValue("@id", card.id) ;
                 cmd.Parameters.AddWithValue("@name", card.name);
                 cmd.Parameters.AddWithValue("@damage", card.damage);
@@ -137,7 +171,7 @@ namespace MTCG
             try
             {
                 using NpgsqlConnection conn = OpenConnection();
-                using var cmd = new NpgsqlCommand("select name, damage, isLocked, element, cardtype from Card where id=@id", conn);
+                using var cmd = new NpgsqlCommand("select \"Name\", \"Damage\", \"isLocked\", \"Element\", \"Cardtype\" from \"Card\" where \"id\"=@id", conn);
                 cmd.Parameters.AddWithValue("@id", id);
                 cmd.Prepare();
 
@@ -166,9 +200,9 @@ namespace MTCG
             try
             {
                 using NpgsqlConnection conn = OpenConnection();
-                using var cmd = new NpgsqlCommand("insert into Package values (@id,@cards)", conn);
+                using var cmd = new NpgsqlCommand("insert into \"Package\" values (@id,@cards)", conn);
                 cmd.Parameters.AddWithValue("@id", pack.id);
-                cmd.Parameters.AddWithValue("@cards",pack.cards.Select((v)=>v.id));
+                cmd.Parameters.AddWithValue("@cards",pack.cards.Select((v)=>v.id).ToList());
 
                 Console.WriteLine(cmd.CommandText);
                 cmd.Prepare();
@@ -182,32 +216,36 @@ namespace MTCG
             }
         }
 
-        public Package ReadPackage(Guid id)
+        public List<Package> ReadPackages()
         {
             try
             {
                 using NpgsqlConnection conn = OpenConnection();
-                using var cmd = new NpgsqlCommand("select id, cards from Package where id=@id", conn);
-                cmd.Parameters.AddWithValue("@id", id);
+                using var cmd = new NpgsqlCommand("select \"ID\", \"Cards\" from \"Package\"", conn);
                 cmd.Prepare();
 
                 NpgsqlDataReader reader = cmd.ExecuteReader();
 
                 if (!reader.Read())
                     return null;
-                Guid[] cards = reader.GetFieldValue <Guid[]>(0);
-
-                List<Card> res = new List<Card>();
-                foreach (var item in cards)
+                List<Package> packages = new List<Package>();
+                while (reader.Read())
                 {
-                    Card tmp;
-                    if((tmp=ReadCard(item))!= null)
-                    {
-                        res.Add(tmp);
-                    }
-                }
+                    Guid id = reader.GetFieldValue<Guid>(0);
+                    Guid[] cards = reader.GetFieldValue<Guid[]>(1);
 
-                return new Package(id, res);
+                    List<Card> res = new List<Card>();
+                    foreach (var item in cards)
+                    {
+                        Card tmp;
+                        if ((tmp = ReadCard(item)) != null)
+                        {
+                            res.Add(tmp);
+                        }
+                    }
+                    packages.Add(new Package(id, res));
+                }
+                return packages;
             }
             catch (Exception e)
             {
@@ -221,9 +259,9 @@ namespace MTCG
             try
             {
                 using NpgsqlConnection conn = OpenConnection();
-                using var cmd = new NpgsqlCommand("insert into Deck values (@id,@cards)", conn);
+                using var cmd = new NpgsqlCommand("insert into \"Deck\" values (@id,@cards)", conn);
                 cmd.Parameters.AddWithValue("@id", user.ID);
-                cmd.Parameters.AddWithValue("@cards", user.Deck.Select((v) => v.id));
+                cmd.Parameters.AddWithValue("@cards", user.Deck.Select((v) => v.id).ToList());
 
                 Console.WriteLine(cmd.CommandText);
                 cmd.Prepare();
@@ -232,6 +270,7 @@ namespace MTCG
             }
             catch (Exception e)
             {
+                Console.WriteLine("CreateDeck");
                 Console.WriteLine(e.Message);
                 return false;
             }
@@ -242,9 +281,9 @@ namespace MTCG
             try
             {
                 using NpgsqlConnection conn = OpenConnection();
-                using var cmd = new NpgsqlCommand("update Deck set @cards where @id=Player", conn);
+                using var cmd = new NpgsqlCommand("update \"Deck\" set \"Card\"=@cards where @id=\"Player\"", conn);
                 cmd.Parameters.AddWithValue("@id", user.ID);
-                cmd.Parameters.AddWithValue("@cards", user.Deck.Select((v) => v.id));
+                cmd.Parameters.AddWithValue("@cards", user.Deck.Select((v) => v.id).ToList());
 
                 Console.WriteLine(cmd.CommandText);
                 cmd.Prepare();
@@ -258,13 +297,13 @@ namespace MTCG
             }
         }
 
-        public List<Card> ReadDeck(User user)
+        public List<Card> ReadDeck(Guid id)
         {
             try
             {
                 using NpgsqlConnection conn = OpenConnection();
-                using var cmd = new NpgsqlCommand("select cards from Deck where id=@id", conn);
-                cmd.Parameters.AddWithValue("@id", user.ID);
+                using var cmd = new NpgsqlCommand("select \"Card\" from \"Deck\" where \"Player\"=@id", conn);
+                cmd.Parameters.AddWithValue("@id", id);
                 cmd.Prepare();
 
                 NpgsqlDataReader reader = cmd.ExecuteReader();
@@ -296,12 +335,13 @@ namespace MTCG
             try
             {
                 using NpgsqlConnection conn = OpenConnection();
-                using var cmd = new NpgsqlCommand("insert into Trade values (@id,@card,@cardtype,@element,@mindamage)", conn);
+                using var cmd = new NpgsqlCommand("insert into \"Trade\" values (@id,@card,@cardtype,@element,@mindamage,@player)", conn);
                 cmd.Parameters.AddWithValue("@id", trade.id);
                 cmd.Parameters.AddWithValue("@card", trade.card.id);
                 cmd.Parameters.AddWithValue("@cardtype", trade.cardtype);
                 cmd.Parameters.AddWithValue("@element", trade.element);
                 cmd.Parameters.AddWithValue("@mindamage", trade.minDamage);
+                cmd.Parameters.AddWithValue("@player", trade.user);
 
                 Console.WriteLine(cmd.CommandText);
                 cmd.Prepare();
@@ -320,7 +360,7 @@ namespace MTCG
             try
             {
                 using NpgsqlConnection conn = OpenConnection();
-                using var cmd = new NpgsqlCommand("SELECT \"Id\", card, cardtype, element, minDamage FROM Trade", conn);
+                using var cmd = new NpgsqlCommand("SELECT \"Id\", card, cardtype, element, minDamage, user FROM \"Trade\"", conn);
                 cmd.Prepare();
 
                 NpgsqlDataReader reader = cmd.ExecuteReader();
@@ -335,11 +375,13 @@ namespace MTCG
                     Cardtype type = reader.GetFieldValue<Cardtype>(2);
                     Element element = reader.GetFieldValue<Element>(3);
                     int minDamage = reader.GetInt32(4);
+                    Guid userid = reader.GetGuid(5);
+                    User user = ReadPlayer(userid);
                     Card card = ReadCard(carduuid);
                     if (element == default)
-                        trades.Add(new Trade(guid, card, type, minDamage));
+                        trades.Add(new Trade(user,guid, card, type, minDamage));
                     else
-                        trades.Add(new Trade(guid, card, type, element));
+                        trades.Add(new Trade(user,guid, card, type, element));
                 }
                 return trades;
             }
@@ -351,12 +393,12 @@ namespace MTCG
             
         }
 
-        public bool UpdateTrade(Trade trade)
+        /*public bool UpdateTrade(Trade trade)
         {
             try
             {
                 using NpgsqlConnection conn = OpenConnection();
-                using var cmd = new NpgsqlCommand("update Trade set card=@card, cardtype=@cardtype, element=@element, mindamage=@mindamage where id=@id", conn);
+                using var cmd = new NpgsqlCommand("update Trade set card=@card, cardtype=@cardtype, element=@element, mindamage=@mindamage where \"Id\"=@id", conn);
                 cmd.Parameters.AddWithValue("@id", trade.id);
                 cmd.Parameters.AddWithValue("@card", trade.card.id);
                 cmd.Parameters.AddWithValue("@cardtype", trade.cardtype);
@@ -370,14 +412,33 @@ namespace MTCG
             {
                 return false;
             }
-        }
+        }*/
+        public bool DeleteTrade(Guid id)
+        {
+            try
+            {
+                using NpgsqlConnection conn = OpenConnection();
+                using var cmd = new NpgsqlCommand("delete from \"Trade\" where @id=\"ID\"", conn);
+                cmd.Parameters.AddWithValue("@id", id);
 
+                Console.WriteLine(cmd.CommandText);
+                cmd.Prepare();
+                cmd.ExecuteNonQuery();
+                return true;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return false;
+            }
+        }
+    
         public bool DeletePackage(Package pack)
         {
             try
             {
                 using NpgsqlConnection conn = OpenConnection();
-                using var cmd = new NpgsqlCommand("delete Package where @id=ID", conn);
+                using var cmd = new NpgsqlCommand("delete from \"Package\" where @id=\"ID\"", conn);
                 cmd.Parameters.AddWithValue("@id", pack.id);
 
                 Console.WriteLine(cmd.CommandText);
@@ -397,9 +458,9 @@ namespace MTCG
             try
             {
                 using NpgsqlConnection conn = OpenConnection();
-                using var cmd = new NpgsqlCommand("insert into stack values (@id,@cards)", conn);
+                using var cmd = new NpgsqlCommand("insert into \"Stack\" values (@id,@cards)", conn);
                 cmd.Parameters.AddWithValue("@id", user.ID);
-                cmd.Parameters.AddWithValue("@cards", user.Stack.Select((v) => v.id));
+                cmd.Parameters.AddWithValue("@cards", user.Stack.Select((v) => v.id).ToList());
 
                 Console.WriteLine(cmd.CommandText);
                 cmd.Prepare();
@@ -418,9 +479,9 @@ namespace MTCG
             try
             {
                 using NpgsqlConnection conn = OpenConnection();
-                using var cmd = new NpgsqlCommand("update Stack set @cards where @id=Player", conn);
+                using var cmd = new NpgsqlCommand("update \"Stack\" set \"Card\"=@cards where @id=\"Player\"", conn);
                 cmd.Parameters.AddWithValue("@id", user.ID);
-                cmd.Parameters.AddWithValue("@cards", user.Stack.Select((v) => v.id));
+                cmd.Parameters.AddWithValue("@cards", user.Stack.Select((v) => v.id).ToList());
 
                 Console.WriteLine(cmd.CommandText);
                 cmd.Prepare();
@@ -434,13 +495,13 @@ namespace MTCG
             }
         }
 
-        public List<Card> ReadStack(User user)
+        public List<Card> ReadStack(Guid id)
         {
             try
             {
                 using NpgsqlConnection conn = OpenConnection();
-                using var cmd = new NpgsqlCommand("select cards from Stack where id=@id", conn);
-                cmd.Parameters.AddWithValue("@id", user.ID);
+                using var cmd = new NpgsqlCommand("select \"Card\" from \"Stack\" where \"Player\"=@id", conn);
+                cmd.Parameters.AddWithValue("@id", id);
                 cmd.Prepare();
 
                 NpgsqlDataReader reader = cmd.ExecuteReader();
@@ -473,7 +534,7 @@ namespace MTCG
             {
 
                 using NpgsqlConnection conn = OpenConnection();
-                using var cmd = new NpgsqlCommand("select id, pwhash, coins, elo, wongames, image, bio, username from \"user\" order by elo, wongames", conn);
+                using var cmd = new NpgsqlCommand("select \"Id\", \"Password\", \"Coins\", \"Elo\", \"WonGames\", \"Image\", \"Bio\", \"Name\" from \"user\" order by \"Elo\", \"WonGames\"", conn);
                 cmd.Prepare();
 
                 NpgsqlDataReader reader = cmd.ExecuteReader();
@@ -491,41 +552,9 @@ namespace MTCG
                     string image = reader.GetString(5);
                     string bio = reader.GetString(6);
                     string username = reader.GetString(7);
-                    sortedList.Add(new User(guid, username, pw, coins, elo, won, image, bio));
+                    sortedList.Add(new User(guid, username, pw, coins, elo, won, image, bio,null,null));
                 }
                 return sortedList;
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
-                return null;
-            }
-        }
-        public List<Card> ReadStack(Guid id)
-        {
-            try
-            {
-                using NpgsqlConnection conn = OpenConnection();
-                using var cmd = new NpgsqlCommand("select cards from Stack where id=@id", conn);
-                cmd.Parameters.AddWithValue("@id", id);
-                cmd.Prepare();
-
-                NpgsqlDataReader reader = cmd.ExecuteReader();
-
-                if (!reader.Read())
-                    return null;
-                Guid[] cards = reader.GetFieldValue<Guid[]>(0);
-
-                List<Card> res = new List<Card>();
-                foreach (var item in cards)
-                {
-                    Card tmp;
-                    if ((tmp = ReadCard(item)) != null)
-                    {
-                        res.Add(tmp);
-                    }
-                }
-                return res;
             }
             catch (Exception e)
             {

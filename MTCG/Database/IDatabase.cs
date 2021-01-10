@@ -7,6 +7,7 @@ namespace MTCG
     interface IDatabase
     {
         User ReadPlayer(string username);
+        User ReadPlayer(Guid id);
         bool UpdatePlayer(User user);
         bool CreatePlayer(User user);
 
@@ -14,20 +15,20 @@ namespace MTCG
         Card ReadCard(Guid id);
 
         bool CreatePackage(Package pack);
-        Package ReadPackage(Guid id);
+        List<Package> ReadPackages();
         bool DeletePackage(Package pack);
 
         bool CreateDeck(User user);
         bool UpdateDeck(User user);
-        List<Card> ReadDeck(User user);
+        List<Card> ReadDeck(Guid guid);
 
         bool CreateStack(User user);
         bool UpdateStack(User user);
-        List<Card> ReadStack(User user);
+        List<Card> ReadStack(Guid guid);
 
         bool CreateTrade(Trade trade);
         List<Trade> ReadTrades();
-        bool UpdateTrade(Trade trade);
+        bool DeleteTrade(Guid id);
 
         List<User> ReadScoreboard();
     }

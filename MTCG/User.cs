@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
-
+using System.Linq;
 namespace MTCG
 {
     public class User
@@ -11,8 +11,8 @@ namespace MTCG
         public string Username { get; set; }
         public byte[] PWHash { get; private set; }
         public List<Card> Stack { get; private set; } = new List<Card>();
-        public int Coins { get; }
-        public List<Card> Deck { get; private set; } = new List<Card>();
+        public int Coins { get; set; }
+        public List<Card> Deck { get; set; } = new List<Card>();
         public int ELO { get; private set; }
         public int WonGames { get; private set; }
         public string Image { get; set; }
@@ -43,6 +43,7 @@ namespace MTCG
             this.Stack = stack;
         }
         public void SetPassword(string pw) => PWHash = SHA256.Create().ComputeHash(Encoding.UTF8.GetBytes(ID.ToString() + pw));
+        public bool CheckPassword(string pw)=> SHA256.Create().ComputeHash(Encoding.UTF8.GetBytes(ID.ToString() + pw)).SequenceEqual(this.PWHash);
         public void Win()
         {
             WonGames++;
@@ -50,12 +51,11 @@ namespace MTCG
         }
         public void Lose()
         {
-            WonGames++;
             ELO -= 5;
         }
         public void Draw()
         {
-            WonGames++;
+            //Could add functionality for handling draws
         }
     }
 }
