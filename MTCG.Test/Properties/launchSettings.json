@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "MTCG": {
+    "MTCG.Test": {
       "commandName": "Project",
       "environmentVariables": {
         "Username": "Mtcg",

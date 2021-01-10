@@ -10,7 +10,7 @@ namespace MTCG
         public Guid ID { get; }
         public string Username { get; set; }
         public byte[] PWHash { get; private set; }
-        public List<Card> Stack { get; private set; } = new List<Card>();
+        public List<Card> Stack { get; set; } = new List<Card>();
         public int Coins { get; set; }
         public List<Card> Deck { get; set; } = new List<Card>();
         public int ELO { get; private set; }
@@ -18,7 +18,7 @@ namespace MTCG
         public string Image { get; set; }
         public string Bio { get; set; }
 
-        public User(Guid id, string name, string pw)
+        public User(Guid id, string name, string pw)//different constructors for different inputs, data from database and from user
         {
             this.ID = id;
             this.Username = name;
@@ -43,7 +43,7 @@ namespace MTCG
             this.Stack = stack;
         }
         public void SetPassword(string pw) => PWHash = SHA256.Create().ComputeHash(Encoding.UTF8.GetBytes(ID.ToString() + pw));
-        public bool CheckPassword(string pw)=> SHA256.Create().ComputeHash(Encoding.UTF8.GetBytes(ID.ToString() + pw)).SequenceEqual(this.PWHash);
+        public bool CheckPassword(string pw) => SHA256.Create().ComputeHash(Encoding.UTF8.GetBytes(ID.ToString() + pw)).SequenceEqual(this.PWHash);//Check every byte for checking the pw
         public void Win()
         {
             WonGames++;

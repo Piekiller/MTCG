@@ -6,7 +6,7 @@ namespace MTCGLauncher
     {
         static void Main(string[] args)
         {
-            Server s = new Server();
+            Server s = new Server(new PostgreSQLDB());
             s.RegisterRoutes();
             Console.ReadKey();
         }

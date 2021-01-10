@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "MTCG": {
+    "MTCGLauncher": {
       "commandName": "Project",
       "environmentVariables": {
         "Username": "Mtcg",

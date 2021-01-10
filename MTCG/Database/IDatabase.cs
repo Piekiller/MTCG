@@ -4,7 +4,7 @@ using System.Text;
 
 namespace MTCG
 {
-    interface IDatabase
+    public interface IDatabase
     {
         User ReadPlayer(string username);
         User ReadPlayer(Guid id);
@@ -13,6 +13,7 @@ namespace MTCG
 
         bool CreateCard(Card card);
         Card ReadCard(Guid id);
+        bool UpdateCard(Card card);
 
         bool CreatePackage(Package pack);
         List<Package> ReadPackages();

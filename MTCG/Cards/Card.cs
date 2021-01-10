@@ -33,13 +33,13 @@ namespace MTCG
         }
         public Card Attack(Card other)
         {
-            if (this.CalculateDamage(other) == other.CalculateDamage(this))
+            if (this.CalculateDamage(other) == other.CalculateDamage(this))//In case of a draw
                 return null;
-            return this.CalculateDamage(other) > other.CalculateDamage(this) ? this : other;
+            return this.CalculateDamage(other) > other.CalculateDamage(this) ? this : other;//if this does make more damage it is returnend and vice versa
         }
         private int CalculateDamage(Card other)
         {
-            if (this.name.ToLower().Contains("goblin") && other.name.ToLower().Contains("dragon"))
+            if (this.name.ToLower().Contains("goblin") && other.name.ToLower().Contains("dragon"))//Check for special cases
                 return 0;
 
             if (this.name.ToLower().Contains("ork") && other.name.ToLower().Contains("wizard"))
@@ -54,7 +54,7 @@ namespace MTCG
             if (this.name.ToLower().Contains("Dragon") && other.name == "FireElve")
                 return 0;
 
-            if (this.type == Cardtype.Monster && other.type==Cardtype.Spell)
+            if (this.type == Cardtype.Monster && other.type==Cardtype.Monster)
                 return damage;
             /* water -> fire
             •  fire -> normal
@@ -85,11 +85,11 @@ namespace MTCG
             return "Name: "+name+" Element: "+element+" Damage: "+damage;
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object obj)//Important for Lists as Contains doesn't work without it.
         {
             return this.id.Equals((obj as Card).id);
         }
-        public override int GetHashCode()
+        public override int GetHashCode()//Important for Dictionaries
         {
             return id.GetHashCode();
         }

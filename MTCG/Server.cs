@@ -12,9 +12,15 @@ namespace MTCG
 {
     public class Server
     {
-        #region ClassesForDeserialization
         ConcurrentQueue<Package> packages = new ConcurrentQueue<Package>();
-        class UserDes
+        private volatile User fp;//Firstplayer joining matchmaking
+        private SemaphoreSlim battleLimit = new SemaphoreSlim(2, 2);//Limits the users joining matchmaking
+        private SemaphoreSlim lockSerial = new SemaphoreSlim(1, 1);//Limits on one user going through
+        private SemaphoreSlim lockResult = new SemaphoreSlim(0, 1);//Locks the first player for waiting on the result
+        private List<string> log;//The returned log
+
+        #region ClassesForDeserialization
+        public class UserDes//classes for deserialization of jsons, should be put in another file
         {
             public string Username;
             public string Password;
@@ -25,15 +31,27 @@ namespace MTCG
             public string name;
             public double damage;
         }
+        class TradeDes
+        {
+            public Guid id;
+            public Guid CardToTrade;
+            public Cardtype Type;
+            public int MinimumDamage;
+            public Element element;
+        }
         #endregion
-        private IDatabase db = new PostgreSQLDB();
+        public Server(IDatabase db)
+        {
+            this.db = db;
+        }
+        IDatabase db;
         public void RegisterRoutes()
         {
-            JsonConvert.DefaultSettings = () => new JsonSerializerSettings() { Converters = new List<JsonConverter> { new Newtonsoft.Json.Converters.StringEnumConverter() } };
+            JsonConvert.DefaultSettings = () => new JsonSerializerSettings() { Converters = new List<JsonConverter> { new Newtonsoft.Json.Converters.StringEnumConverter() } };//Enables Conversion of enums
             HTTPServer server = new HTTPServer(10001);
             server.RegisterRoute("POST", "/users", (ac,sw) =>
             {
-                var res = JsonConvert.DeserializeObject<UserDes>(ac.Payload);
+                var res = JsonConvert.DeserializeObject<UserDes>(ac.Payload);//deserialize the basic user(name,pw)
                 User user = new User(Guid.NewGuid(), res.Username, res.Password);
                 if (Register(user))
                 {
@@ -56,14 +74,14 @@ namespace MTCG
             server.RegisterRoute("POST", "/packages", (ac, sw) =>
             {
                 string user;
-                if ((user=CheckAuthorization(ac))==null||user!="admin")
+                if ((user=CheckAuthorization(ac))==null||user!="admin")//check if correct user or admin
                 {
                     HTTPServer.SendError(sw, HttpStatusCode.Forbidden, "Invalid token");
                     return;
                 }
                 List<CardDes> cards = JsonConvert.DeserializeObject<List<CardDes>>(ac.Payload);
                 List<Card> res = new List<Card>();
-                foreach (var item in cards)
+                foreach (var item in cards)//go through every card parse it and then save it to the db.
                 {
                     Element element;
                     if (item.name.ToLower().Contains("water"))
@@ -80,7 +98,7 @@ namespace MTCG
                     }
                     res.Add(card);
                 }
-                Package package = new Package(Guid.NewGuid(), res);
+                Package package = new Package(Guid.NewGuid(), res);//Create package and save it in the queue and the database. (in the queue because the order of the packages would be weird and the curl script wont work)
                 packages.Enqueue(package);
                 if (db.CreatePackage(package))
                 {
@@ -98,32 +116,40 @@ namespace MTCG
                     HTTPServer.SendError(sw, HttpStatusCode.Forbidden, "Invalid token");
                     return;
                 }
+
                 User us = db.ReadPlayer(user);
                 if (packages.Count == 0)//If there are no packages in Queue
                 {
                     List<Package> package = new List<Package>();
                     if ((package = db.ReadPackages()) == null||package.Count==0)//get Packages from database and if there are no packages
                     {
-                        HTTPServer.SendError(sw, HttpStatusCode.NoContent, "There are no packages");
+                        HTTPServer.SendError(sw, HttpStatusCode.InternalServerError, "There are no packages");
                         return;
                     }
-                    package.ForEach(v => packages.Enqueue(v));//Speichert alle packages in die concurrent Queue
+                    package.ForEach(v => packages.Enqueue(v));//Saves every package from the db into the queue
                 }
-                packages.TryDequeue(out Package bought);
+
                 if(us.Coins<5)
                 {
                     HTTPServer.SendError(sw, HttpStatusCode.BadRequest, "Not enough coins");
                     return;
                 }
+                packages.TryDequeue(out Package bought);
                 us.Coins -= 5;
                 us.Stack.AddRange(bought.cards);
-                if (db.UpdateStack(us) == false)
+                if (!db.UpdatePlayer(us))
+                {
+                    HTTPServer.SendError(sw, HttpStatusCode.InternalServerError, "Could not save coins update of Player in database");
+                    us.Coins += 5;
+                    return;
+                }
+                if (!db.UpdateStack(us))
                 {
                     HTTPServer.SendError(sw, HttpStatusCode.InternalServerError, "Could not save Stack in database");
                     us.Coins += 5;
                     return;
                 }
-                if(db.DeletePackage(bought) == false)
+                if(!db.DeletePackage(bought))
                 {
                     HTTPServer.SendError(sw, HttpStatusCode.InternalServerError, "Could not delete package in database");
                     return;
@@ -171,31 +197,36 @@ namespace MTCG
                     return;
                 }
                 User user = db.ReadPlayer(username);
-                List<Guid> cardids = JsonConvert.DeserializeObject<List<Guid>>(ac.Payload);
+                List<Guid> cardids = JsonConvert.DeserializeObject<List<Guid>>(ac.Payload);//Deserialize cards
                 if(cardids.Count!=4)
                 {
                     HTTPServer.SendError(sw, HttpStatusCode.BadRequest, "Too many or too few cards");
                     return;
                 }
                 List<Card> cards = new List<Card>();
-                cardids.ForEach(v =>
+                cardids.ForEach(v =>//read every card
                 {
                     Card c;
                     if ((c = db.ReadCard(v)) != null)
                         cards.Add(c);
                 });
+                if (cards.Count != 4)
+                {
+                    HTTPServer.SendError(sw, HttpStatusCode.BadRequest, "Too many or too few cards, Problem in reading Card");
+                    return;
+                }
                 if (user != null)
                 {
                     bool isinListOrNotLocked = true;
                     
                     cards.ForEach(v =>
-                    {
+                    {//Check if the card is not in the stack or is locked(trading)
                         if (!user.Stack.Contains(v)||v.isLocked)
                             isinListOrNotLocked = false;
                     }) ;
                     if (!isinListOrNotLocked)
                     {
-                        HTTPServer.SendError(sw, HttpStatusCode.BadRequest, "Not every card is in stack");
+                        HTTPServer.SendError(sw, HttpStatusCode.BadRequest, "Not every card is in stack or locked");
                     }
                     else
                     {
@@ -210,7 +241,7 @@ namespace MTCG
             {
                 string usernameURI = ac.Path.Substring(ac.Path.LastIndexOf('/')+1);
                 string username;
-                if ((username = CheckAuthorization(ac)) == null||(username!=usernameURI&&username!="admin"))//username=username aus token und usernameUri ist der aus dem Path. Wenn ein Admin einen Acc sehen will darf er das.
+                if ((username = CheckAuthorization(ac)) == null||(username!=usernameURI&&username!="admin"))//username=username from token and usernameUri from path. If a admin wants to see a profile they can
                 {
                     HTTPServer.SendError(sw, HttpStatusCode.Forbidden, "Invalid token");
                     return;
@@ -220,14 +251,14 @@ namespace MTCG
             });
             server.RegisterRoute("PUT", "/users/", (ac, sw) =>
             {
-                string usernameURI = ac.Path.Substring(ac.Path.LastIndexOf('/'));
+                string usernameURI = ac.Path.Substring(ac.Path.LastIndexOf('/')+1);
                 string username;
-                if ((username = CheckAuthorization(ac)) == null || username != usernameURI || username != "admin")//username=username aus token und usernameUri ist der aus dem Path. Wenn ein Admin einen Acc sehen will darf er das.
+                if ((username = CheckAuthorization(ac)) == null || username != usernameURI)//username=username from token and usernameUri from path.
                 {
                     HTTPServer.SendError(sw, HttpStatusCode.Forbidden, "Invalid token");
                     return;
                 }
-                if (ac.Payload == string.Empty)
+                if (string.IsNullOrWhiteSpace(ac.Payload))
                 {
                     HTTPServer.SendError(sw, HttpStatusCode.BadRequest,"No data for creating user");
                     return;
@@ -239,7 +270,7 @@ namespace MTCG
                     return;
                 }
                 Dictionary<string, string> data = JsonConvert.DeserializeObject<Dictionary<string, string>>(ac.Payload);
-                foreach (var item in data)
+                foreach (var item in data)//see what Key is present and change it
                 {
                     switch (item.Key)
                     {
@@ -273,8 +304,7 @@ namespace MTCG
                 User user = db.ReadPlayer(username);
                 if (user != null)
                 {
-                    //TODO: Maybe fix if structure bad
-                    HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(new { ELO=user.ELO,WonGames=user.WonGames}));
+                    HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(new { ELO=user.ELO,WonGames=user.WonGames}));//Create anonymous type so it is more readable in json, could be made into a class
                     return;
                 }
                 HTTPServer.SendError(sw, HttpStatusCode.NotFound,"User not found");
@@ -283,11 +313,11 @@ namespace MTCG
             {
                 List<User> scoreboard=db.ReadScoreboard();
                 if (scoreboard != null)
-                    HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(scoreboard.Select(u=>(u.Username,u.WonGames,u.ELO)).ToList()));
+                    HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(scoreboard.Select(u=> new { Username=u.Username,ELO = u.ELO,WonGames = u.WonGames}).ToList()));
                 else
                     HTTPServer.SendError(sw, HttpStatusCode.InternalServerError, "Could not load scoreboard");
             });
-            server.RegisterRoute("POST", "/battles", (ac, sw) =>
+            server.RegisterRoute("POST", "/battle/normal", (ac, sw) =>
             {
                 string username;
                 if ((username = CheckAuthorization(ac)) == null)
@@ -301,8 +331,34 @@ namespace MTCG
                     HTTPServer.SendError(sw, HttpStatusCode.BadRequest, "User not found");
                     return;
                 }
-                List<string> log=JoinMatchmaking(user);
-                db.UpdatePlayer(user);
+                List<string> log=JoinMatchmaking(user,false);
+                if (!db.UpdatePlayer(user))
+                {
+                    HTTPServer.SendError(sw, HttpStatusCode.InternalServerError, "Player could not be updated");
+                    return;
+                }
+                HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(log));
+            });
+            server.RegisterRoute("POST", "/battle/random", (ac, sw) =>
+            {
+                string username;
+                if ((username = CheckAuthorization(ac)) == null)
+                {
+                    HTTPServer.SendError(sw, HttpStatusCode.Forbidden, "Invalid token");
+                    return;
+                }
+                User user;
+                if ((user = db.ReadPlayer(username)) == null)
+                {
+                    HTTPServer.SendError(sw, HttpStatusCode.BadRequest, "User not found");
+                    return;
+                }
+                List<string> log = JoinMatchmaking(user,true);
+                if (!db.UpdatePlayer(user))
+                {
+                    HTTPServer.SendError(sw, HttpStatusCode.InternalServerError, "Player could not be updated");
+                    return;
+                }
                 HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(log));
             });
             server.RegisterRoute("GET", "/tradings", (ac, sw) =>
@@ -319,13 +375,9 @@ namespace MTCG
                     HTTPServer.SendError(sw, HttpStatusCode.BadRequest, "Trades not found");
                     return;
                 }
-                HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(trades));
+                HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(trades.Select(t=>new { ID = t.id, Card = t.card,Type=t.cardtype,Element=t.element,minDamage=t.minDamage })));
             });
             server.RegisterRoute("POST", "/tradings", (ac, sw) =>
-            {
-                //ToDo: POST Tradings
-            }); 
-            server.RegisterRoute("DELETE", "/tradings", (ac, sw) =>
             {
                 string username;
                 if ((username = CheckAuthorization(ac)) == null)
@@ -333,64 +385,180 @@ namespace MTCG
                     HTTPServer.SendError(sw, HttpStatusCode.Forbidden, "Invalid token");
                     return;
                 }
-                Guid id = JsonConvert.DeserializeObject<Guid>(ac.Payload);
-                if (!db.DeleteTrade(id))
+                User user;
+                if ((user = db.ReadPlayer(username)) == null)
                 {
-                    HTTPServer.SendError(sw, HttpStatusCode.BadRequest, "Trade could not be deleted");
+                    HTTPServer.SendError(sw, HttpStatusCode.BadRequest, "User not found");
                     return;
                 }
-                HTTPServer.SendSuccess(sw, HttpStatusCode.OK, "Trade del");
+                
+                TradeDes deserialized = JsonConvert.DeserializeObject<TradeDes>(ac.Payload);
+                Card card;
+                if ((card = db.ReadCard(deserialized.CardToTrade)) == null||card.isLocked)
+                {
+                    HTTPServer.SendError(sw, HttpStatusCode.InternalServerError, "Card not found or locked");
+                    return;
+                }
+                if(user.Deck.Contains(card))
+                {
+                    HTTPServer.SendError(sw, HttpStatusCode.InternalServerError, "Card contained in deck");
+                    return;
+                }
+                Trade trade;
+                if (deserialized.element == default)
+                    trade = new Trade(user, deserialized.id, card, deserialized.Type, deserialized.MinimumDamage);
+                else
+                    trade = new Trade(user, deserialized.id, card, deserialized.Type, deserialized.element);
+                if (!db.CreateTrade(trade))
+                {
+                    HTTPServer.SendError(sw, HttpStatusCode.InternalServerError, "Trade could not be created in the database");
+                    return;
+                }
+                card.isLocked = true;
+                if (!db.UpdateCard(card))
+                {
+                    HTTPServer.SendError(sw, HttpStatusCode.InternalServerError, "Card could not be updated");
+                    return;
+                }
+                HTTPServer.SendSuccess(sw, HttpStatusCode.OK, "Trade successfull and Card is locked");
+            });
+            server.RegisterRoute("POST", "/tradings/", (ac, sw) =>
+            {
+                Guid id = Guid.Parse(ac.Path.Substring(ac.Path.LastIndexOf('/')+1));
+                string username;
+                if ((username = CheckAuthorization(ac)) == null)
+                {
+                    HTTPServer.SendError(sw, HttpStatusCode.Forbidden, "Invalid token");
+                    return;
+                }
+                Trade trade = db.ReadTrades().Where(v => v.id == id).FirstOrDefault();
+                if (trade == null)
+                {
+                    HTTPServer.SendError(sw, HttpStatusCode.InternalServerError, "Trade not found");
+                    return;
+                }
+                User user = db.ReadPlayer(username);
+                if (user == null)
+                {
+                    HTTPServer.SendError(sw, HttpStatusCode.InternalServerError, "User not found");
+                    return;
+                }
+                if (trade.user.ID == user.ID)
+                {
+                    HTTPServer.SendError(sw, HttpStatusCode.InternalServerError, "Cannot trade with yourself");
+                    return;
+                }
+                Guid otherid = JsonConvert.DeserializeObject<Guid>(ac.Payload);
+                Card other;
+                if ((other = db.ReadCard(otherid))==null)
+                {
+                    HTTPServer.SendError(sw, HttpStatusCode.InternalServerError, "No other card");
+                    return;
+                }
+                if (trade.TryTrade(other))
+                {
+                    user.Stack.Remove(other);
+                    trade.user.Stack.Remove(trade.card);
+
+                    user.Stack.Add(trade.card);
+                    trade.user.Stack.Add(other);
+                    bool b1 = db.UpdateStack(user);
+                    bool b2 = db.UpdateStack(trade.user);
+                    if (!b1||!b2)
+                    {
+                        HTTPServer.SendError(sw, HttpStatusCode.InternalServerError, "You got scammed");
+                        return;
+                    }
+                    HTTPServer.SendSuccess(sw, HttpStatusCode.OK, "Trading successful");
+                    return;
+                }
+                HTTPServer.SendError(sw, HttpStatusCode.InternalServerError, "Trading was cancelled");
+            });
+            server.RegisterRoute("DELETE", "/tradings/", (ac, sw) =>
+            {
+                string username;
+                if ((username = CheckAuthorization(ac)) == null)
+                {
+                    HTTPServer.SendError(sw, HttpStatusCode.Forbidden, "Invalid token");
+                    return;
+                }
+                List<Trade> trades;
+                if ((trades = db.ReadTrades()) == null)
+                {
+                    HTTPServer.SendError(sw, HttpStatusCode.InternalServerError, "Trade not found");
+                    return;
+                }
+                Guid id = Guid.Parse(ac.Path.Substring(ac.Path.LastIndexOf('/') + 1));
+                Trade t = trades.Where(v => v.id == id).FirstOrDefault();
+                Card c;
+                if ((c = db.ReadCard(t.card.id))==null)
+                {
+                    HTTPServer.SendError(sw, HttpStatusCode.BadRequest, "Card not found");
+                    return;
+                }
+                c.isLocked = false;
+                if (!db.UpdateCard(c))
+                {
+                    HTTPServer.SendError(sw, HttpStatusCode.BadRequest, "Card could not be updated");
+                    return;
+                }
+                if (!db.DeleteTrade(id))
+                {
+                    HTTPServer.SendError(sw, HttpStatusCode.InternalServerError, "Trade could not be deleted");
+                    return;
+                }
+                HTTPServer.SendSuccess(sw, HttpStatusCode.OK, "Trade deleted");
             });
             server.Start();
         }
-        string CheckAuthorization(RequestContext ac)
+        public string CheckAuthorization(RequestContext ac)
         {
             string token;
-            if (!ac.Header.TryGetValue("Authorization", out token))//Es gibt keinen Token
+            if (!ac.Header.TryGetValue("Authorization", out token))//there is no token Autorization
                 return null;
-            string username = token.Split("-")[0].Substring(6);//Filtert den Namen aus dem Token raus. Als erstes den ersten Teil des tokens getrennt mit - und dann den string ab der 6 Stelle um Basic zu entfernen
-            if (db.ReadPlayer(username) != null)
+            string username = token.Split("-")[0].Substring(6);//gets the name out of the token. split the token on '-' get the frist part and then do a substring from the 6th char to the end
+            if (db.ReadPlayer(username) != null)//Check if user exists
                 return username;
             return null;
         }
-        bool Login(UserDes user)
+        public bool Login(UserDes user)
         {
             User res;
-            return (res=db.ReadPlayer(user.Username)) != null&&!res.CheckPassword(user.Password) ? false : true;
+            return (res=db.ReadPlayer(user.Username)) != null&&!res.CheckPassword(user.Password) ? false : true;//Check person exists and check password
         }
-        bool Register(User user)
+        public bool Register(User user)
         {
-            if (db.ReadPlayer(user.Username) == null)//Wenn es keinen User mit dem Username gibt dann wird einer erstellt
+            if (db.ReadPlayer(user.Username) == null)//Create player if no player
             {
-                db.CreatePlayer(user);
-                return true;
+                if (db.CreatePlayer(user))
+                {
+                    return true;
+                }
             }
-            return false;//Wenn es einen gibt dann passiert nix
+            return false;//If readPlayer or createplayer doesn't work
         }
         
-        private volatile User fp;
-        private SemaphoreSlim battleLimit = new SemaphoreSlim(2, 2);
-        private SemaphoreSlim lockSerial = new SemaphoreSlim(1, 1);
-        private SemaphoreSlim lockResult = new SemaphoreSlim(0, 1);
-        private List<string> log;
-        List<string> JoinMatchmaking(User user)
+        
+        List<string> JoinMatchmaking(User user,bool isRandom)
         {
-            battleLimit.Wait();//Nur 2 User können hinein
-            lockSerial.Wait();//Nur 1 User kann weiter machen, dass keine Probleme enstehen.
+            battleLimit.Wait();//2 users can join
+            lockSerial.Wait();//1 user can progress
 
-            if(fp is null)
+            if(fp is null)//check if firstplayer
             {
                 fp = user;
-                lockSerial.Release();//Der 2.te User kann jetzt weiter machen
+                lockSerial.Release();//The second user is free to start the battle
                 lockResult.Wait();//Locks the 1. player until the second player runs the Battle Method
 
                 lockSerial.Release();//Releases the semaphor for other users to join.
-                battleLimit.Release(2);
+                battleLimit.Release(2);//Release for other users having a battle
 
                 return log;
             }
-            log = Battle.Startbattle(fp, user);
-
+            if (isRandom)
+                log = Battle.StartRandomBattle(fp, user);
+            else
+                log = Battle.StartBattle(fp, user);
             lockResult.Release();//1. user can finish and return the log;
             return log;
         }
