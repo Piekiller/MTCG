@@ -167,7 +167,7 @@ namespace MTCG
                 User user = db.ReadPlayer(username);
                 if (user != null)
                 {
-                    HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(user.Stack));
+                    HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(user.Stack, Formatting.Indented));
                     return;
                 }
                 HTTPServer.SendError(sw, HttpStatusCode.NotFound, "User not found");
@@ -183,7 +183,7 @@ namespace MTCG
                 User user = db.ReadPlayer(username);
                 if (user != null)
                 {
-                    HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(user.Deck));
+                    HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(user.Deck, Formatting.Indented));
                     return;
                 }
                 HTTPServer.SendError(sw, HttpStatusCode.NotFound, "User not found");
@@ -247,7 +247,7 @@ namespace MTCG
                     return;
                 }
                 User user = db.ReadPlayer(username);
-                HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(user));
+                HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(user, Formatting.Indented));
             });
             server.RegisterRoute("PUT", "/users/", (ac, sw) =>
             {
@@ -296,6 +296,7 @@ namespace MTCG
             server.RegisterRoute("GET", "/stats", (ac, sw) =>
             {
                 string username;
+                
                 if ((username = CheckAuthorization(ac)) == null)
                 {
                     HTTPServer.SendError(sw, HttpStatusCode.Forbidden, "Invalid token");
@@ -304,7 +305,7 @@ namespace MTCG
                 User user = db.ReadPlayer(username);
                 if (user != null)
                 {
-                    HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(new { ELO=user.ELO,WonGames=user.WonGames}));//Create anonymous type so it is more readable in json, could be made into a class
+                    HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(new { ELO=user.ELO,WonGames=user.WonGames}, Formatting.Indented));//Create anonymous type so it is more readable in json, could be made into a class
                     return;
                 }
                 HTTPServer.SendError(sw, HttpStatusCode.NotFound,"User not found");
@@ -313,7 +314,7 @@ namespace MTCG
             {
                 List<User> scoreboard=db.ReadScoreboard();
                 if (scoreboard != null)
-                    HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(scoreboard.Select(u=> new { Username=u.Username,ELO = u.ELO,WonGames = u.WonGames}).ToList()));
+                    HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(scoreboard.Select(u=> new { Username=u.Username,ELO = u.ELO,WonGames = u.WonGames}).ToList(), Formatting.Indented));
                 else
                     HTTPServer.SendError(sw, HttpStatusCode.InternalServerError, "Could not load scoreboard");
             });
@@ -337,7 +338,7 @@ namespace MTCG
                     HTTPServer.SendError(sw, HttpStatusCode.InternalServerError, "Player could not be updated");
                     return;
                 }
-                HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(log));
+                HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(log, Formatting.Indented));
             });
             server.RegisterRoute("POST", "/battle/random", (ac, sw) =>
             {
@@ -359,7 +360,7 @@ namespace MTCG
                     HTTPServer.SendError(sw, HttpStatusCode.InternalServerError, "Player could not be updated");
                     return;
                 }
-                HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(log));
+                HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(log, Formatting.Indented));
             });
             server.RegisterRoute("GET", "/tradings", (ac, sw) =>
             {
@@ -375,7 +376,7 @@ namespace MTCG
                     HTTPServer.SendError(sw, HttpStatusCode.BadRequest, "Trades not found");
                     return;
                 }
-                HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(trades.Select(t=>new { ID = t.id, Card = t.card,Type=t.cardtype,Element=t.element,minDamage=t.minDamage })));
+                HTTPServer.SendSuccess(sw, HttpStatusCode.OK, JsonConvert.SerializeObject(trades.Select(t=>new { ID = t.id, Card = t.card,Type=t.cardtype,Element=t.element,minDamage=t.minDamage }), Formatting.Indented));
             });
             server.RegisterRoute("POST", "/tradings", (ac, sw) =>
             {

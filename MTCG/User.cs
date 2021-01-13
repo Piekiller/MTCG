@@ -57,5 +57,6 @@ namespace MTCG
         {
             //Could add functionality for handling draws
         }
+        public bool ShouldSerializePWHash() => false;
     }
 }
